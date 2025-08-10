@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Programator</title>
+  <style>
+    :root{--timeline-height:1440px;--time-col-width:70px;--cab-width:300px}
+    *{box-sizing:border-box;font-family:Inter, Roboto, Arial, sans-serif}
+    body{margin:0;background:#f3f4f6;color:#111}
+    .topbar{display:flex;gap:12px;padding:12px;background:#fff;align-items:center;border-bottom:1px solid #e5e7eb}
+    .top-left{font-weight:700;font-size:16px}
+    .date-bar{display:flex;gap:10px;align-items:center;flex:1;min-width:320px}
+    .date-group{display:flex;flex-direction:column;gap:6px;min-width:120px}
+    .date-group b{font-size:13px}
+    .date-scroll{display:flex;gap:6px;overflow-x:auto;padding:6px}
+    .date-item{background:#fff;padding:6px 10px;border-radius:6px;border:1px solid #eee;cursor:pointer;white-space:nowrap;font-size:13px}
+    .date-item.active{background:#2563eb;color:#fff;border-color:#2563eb}
+    .actions{display:flex;gap:8px;align-items:center}
+    .btn{padding:8px 12px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+    .btn.ghost{background:#e5e7eb;color:#111}
+    .btn.warn{background:#dc2626}
+    .btn.small{padding:6px 8px;font-size:13px}
+    .app{display:flex;height:auto;overflow:visible}; overflow-x:auto
+    .times{width:var(--time-col-width);background:#fff;border-right:1px solid #e5e7eb;padding:8px 6px;overflow:visible}
+    .times .slot{height:60px;border-bottom:1px dashed #eee;position:relative;padding-left:6px;font-size:12px;color:#666}
+    .board{flex:1;display:flex;overflow:visible;overflow-x:auto; overflow-y:visible;background:linear-gradient(180deg,#fff,#fbfdff)}
+    .cabinet{width:var(--cab-width);min-width:var(--cab-width);border-right:1px solid #e6e7ea;position:relative}
+    .cabinet .header{padding:8px;text-align:center;background:#fafafa;font-weight:700;border-bottom:1px solid #eee;position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:6px;justify-content:center}
+    .cab-name{flex:1}
+    .cab-controls{display:flex;gap:6px}
+    .timeline{position:relative;height:var(--timeline-height);overflow:visible}
+    .appt{position:absolute;border-radius:8px;padding:4px 8px;color:#111;cursor:grab;display:flex;align-items:center;justify-content:space-between;font-weight:600;box-shadow:0 6px 14px rgba(12,12,12,0.08);overflow:hidden;transition:all .12s ease}
+    .appt .label{z-index:2;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
+    .appt .meta{font-size:11px;opacity:.9}
+    .appt .resize{position:absolute;right:4px;bottom:3px;width:12px;height:12px;border-radius:2px;background:rgba(255,255,255,0.9);border:1px solid rgba(0,0,0,0.08);cursor:s-resize;z-index:5}
+    .appt.expanded{z-index:30}
+    .modal-back{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center}
+    .modal{background:#fff;padding:16px;border-radius:10px;width:560px;box-shadow:0 30px 60px rgba(0,0,0,0.25)}
+    .row{display:flex;gap:8px;margin-bottom:8px}
+    label{font-size:13px;color:#333}
+    input,select,textarea{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px}
+    textarea{min-height:70px}
+    .tooltip{position:fixed;background:rgba(0,0,0,0.88);color:#fff;padding:8px;border-radius:8px;font-size:13px;max-width:360px;display:none;z-index:9999}
+    .sidebar{width:360px;background:#fff;border-left:1px solid #e6e7ea;display:flex;flex-direction:column}
+    .side-header{padding:10px;border-bottom:1px solid #eee;font-weight:700}
+    .side-body{padding:10px;overflow:auto;flex:1}
+    .list-item{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .color-dot{width:18px;height:18px;border-radius:6px;border:1px solid rgba(0,0,0,0.06)}
+    .small-input{width:120px}
+    .muted{color:#666;font-size:13px}
+    @media(max-width:980px){:root{--cab-width:240px;--time-col-width:58px}}
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="top-left">Programator Pacienți — embeddable (GitHub Pages)</div>
+
+    <div class="date-bar" id="dateBar">
+      <div class="date-group">
+        <b>An</b>
+        <div class="date-scroll" id="years"></div>
+      </div>
+      <div class="date-group">
+        <b>Lună</b>
+        <div class="date-scroll" id="months"></div>
+      </div>
+      <div class="date-group">
+        <b>Zi</b>
+        <div class="date-scroll" id="days"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btnSaveCloud" class="btn small">Salvează Cloud</button>
+      <button id="btnLoadCloud" class="btn small ghost">Încarcă Cloud</button>
+      <button id="btnExport" class="btn small ghost">Export JSON</button>
+      <button id="btnImport" class="btn small ghost">Import JSON</button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:0">
+    <div class="app" style="flex:1">
+      <div class="times" id="timesCol"></div>
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+      <div class="side-header">Administrare</div>
+      <div class="side-body">
+        <div style="margin-bottom:12px">
+          <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+            <b>Cabinete</b>
+            <button id="btnAddCab" class="btn small ghost" style="margin-left:auto">Adaugă</button>
+          </div>
+          <div id="cabList"></div>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+            <b>Medici</b>
+            <button id="btnAddDoctor" class="btn small ghost" style="margin-left:auto">Adaugă</button>
+          </div>
+          <div id="doctorsList"></div>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+            <b>Tratamente</b>
+            <button id="btnAddTreat" class="btn small ghost" style="margin-left:auto">Adaugă</button>
+          </div>
+          <div id="treatList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal create/edit appointment -->
+  <div id="modal" style="display:none">
+    <div class="modal-back" id="modalBack">
+      <div class="modal" role="dialog" aria-modal="true">
+        <h3 id="modalTitle">Adaugă/Editează programare</h3>
+        <div class="row">
+          <div style="flex:1">
+            <label>Nume pacient</label>
+            <input id="inpName" placeholder="Prenume Nume">
+          </div>
+          <div style="width:110px">
+            <label>Vârstă</label>
+            <input id="inpAge" type="number" min="0">
+          </div>
+          <div style="width:160px">
+            <label>Telefon</label>
+            <input id="inpPhone" placeholder="07xxxxxxxx">
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex:1">
+            <label>Medic</label>
+            <select id="inpDoctor"></select>
+          </div>
+          <div style="flex:1">
+            <label>Tratament</label>
+            <select id="inpTreat"></select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex:1">
+            <label>Cabinet</label>
+            <select id="inpCab"></select>
+          </div>
+          <div style="width:140px">
+            <label>Start (HH:MM)</label>
+            <input id="inpStart" value="09:00">
+          </div>
+          <div style="width:120px">
+            <label>Durată (min)</label>
+            <input id="inpDur" value="30" type="number">
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:1">
+            <label>Mentiuni</label>
+            <textarea id="inpNotes"></textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+          <button id="btnCancel" class="btn ghost">Anulează</button>
+          <button id="btnDelete" class="btn warn">Șterge</button>
+          <button id="btnSave" class="btn">Salvează</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+<script>
+/* -------------------------
+   CONFIG: pune aici link-ul Apps Script (Web app URL) - înlocuiește cu al tău
+   ------------------------- */
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby9bBIyJcK163aiJaO16QPhZL9HrkeWjhLbxjG4S9S935VOOYAO5NgGdApnAx5Z_8bIlQ/exec";
+
+/* -------------------------
+   MODEL (persist în localStorage + opțional cloud)
+   ------------------------- */
+const STORAGE_KEY = 'prog_app_v2';
+let cabinets = []; // [{id,name}]
+let doctors = [];
+let treatments = [];
+let appts = []; // {id,cabId,startMin,dur,name,age,phone,doctorId,treatId,notes,date}
+let selectedDate = (new Date()).toISOString().slice(0,10);
+let selYear, selMonth, selDay;
+
+/* DOM refs */
+const timesCol = document.getElementById('timesCol');
+const board = document.getElementById('board');
+const tooltip = document.getElementById('tooltip');
+const yearsEl = document.getElementById('years');
+const monthsEl = document.getElementById('months');
+const daysEl = document.getElementById('days');
+const cabListEl = document.getElementById('cabList');
+const doctorsList = document.getElementById('doctorsList');
+const treatList = document.getElementById('treatList');
+
+const inpDoctor = document.getElementById('inpDoctor');
+const inpTreat = document.getElementById('inpTreat');
+const inpCab = document.getElementById('inpCab');
+const modal = document.getElementById('modal');
+const btnCancel = document.getElementById('btnCancel');
+const btnSave = document.getElementById('btnSave');
+const btnDelete = document.getElementById('btnDelete');
+const inpName = document.getElementById('inpName');
+const inpAge = document.getElementById('inpAge');
+const inpStart = document.getElementById('inpStart');
+const inpDur = document.getElementById('inpDur');
+const inpNotes = document.getElementById('inpNotes');
+const inpPhone = document.getElementById('inpPhone');
+
+function uid(prefix='id'){ return prefix + Math.floor(Date.now() + Math.random()*10000).toString(36) }
+function hhmmToMin(str){ const p=(str||'0:0').split(':').map(x=>parseInt(x)||0); return p[0]*60 + p[1]; }
+function minToHhmm(m){ const hh=Math.floor(m/60); const mm=m%60; return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); }
+function hexToRgba(hex,alpha){ const h=(hex||'#ffffff').replace('#',''); const r=parseInt(h.slice(0,2),16)||255, g=parseInt(h.slice(2,4),16)||255, b=parseInt(h.slice(4,6),16)||255; return `rgba(${r},${g},${b},${alpha})` }
+function pxToMin(px){ return Math.max(0, Math.min(1439, Math.round(px))); }
+
+/* local storage */
+function saveLocal(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({cabinets,doctors,treatments,appts}));
+}
+function loadLocal(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(!raw) return false;
+  try{ const p = JSON.parse(raw); cabinets = p.cabinets||[]; doctors = p.doctors||[]; treatments = p.treatments||[]; appts = p.appts||[]; return true; } catch(e){ return false; }
+}
+
+/* bootstrap defaults */
+function bootstrapDefaults(){
+  cabinets = [{id:'cab1',name:'Cabinet 1'},{id:'cab2',name:'Cabinet 2'},{id:'cab3',name:'Cabinet 3'}];
+  doctors = [
+    {id:'d1',nume:'Dr. Andrei Pop', culoare:'#ef6c6c'},
+    {id:'d2',nume:'Dr. Maria Ionescu', culoare:'#f39c12'},
+    {id:'d3',nume:'Dr. Radu Enache', culoare:'#4fd1c5'}
+  ];
+  treatments = [
+    {id:'t1',nume:'Protetica', culoare:'#ffecee'},
+    {id:'t2',nume:'Parodontologie', culoare:'#fff8e6'},
+    {id:'t3',nume:'Endodontie', culoare:'#effaf5'}
+  ];
+  const today = (new Date()).toISOString().slice(0,10);
+  appts = [
+    {id:uid('a'),cabId:'cab1',startMin:9*60,dur:45,name:'Ioana M.',age:33,phone:'07xxxxxxxx',doctorId:'d2',treatId:'t1',notes:'Prima vizită',date:today},
+    {id:uid('a'),cabId:'cab1',startMin:9*60+15,dur:30,name:'Vlad P.',age:28,phone:'07yyyyyyyy',doctorId:'d1',treatId:'t3',notes:'Control',date:today},
+    {id:uid('a'),cabId:'cab2',startMin:10*60,dur:60,name:'Mihnea B.',age:41,phone:'07zzzzzzzz',doctorId:'d3',treatId:'t2',notes:'',date:today}
+  ];
+  saveLocal();
+}
+
+/* -------------------------
+   DATE BAR (ani până în 2100)
+   ------------------------- */
+function initDateStateFromSelected(){
+  const parts = selectedDate.split('-');
+  selYear = parseInt(parts[0],10);
+  selMonth = parseInt(parts[1],10) - 1;
+  selDay = parseInt(parts[2],10);
+}
+function setSelectedDateFromSel(){
+  const dim = new Date(selYear, selMonth + 1, 0).getDate();
+  if(selDay > dim) selDay = dim;
+  const mm = String(selMonth+1).padStart(2,'0'); const dd = String(selDay).padStart(2,'0');
+  selectedDate = `${selYear}-${mm}-${dd}`;
+}
+
+function renderYears(){
+  yearsEl.innerHTML = '';
+  for(let y = 2020; y <= 2100; y++){
+    const d = document.createElement('div');
+    d.className = 'date-item' + (y === selYear ? ' active' : '');
+    d.textContent = y;
+    d.onclick = () => { selYear = y; renderYears(); renderDays(); setSelectedDateFromSel(); renderAll(); };
+    yearsEl.appendChild(d);
+  }
+}
+function renderMonths(){
+  const names = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+  monthsEl.innerHTML = '';
+  for(let m=0;m<12;m++){
+    const d = document.createElement('div');
+    d.className = 'date-item' + (m === selMonth ? ' active' : '');
+    d.textContent = names[m];
+    d.onclick = () => { selMonth = m; renderMonths(); renderDays(); setSelectedDateFromSel(); renderAll(); };
+    monthsEl.appendChild(d);
+  }
+}
+function renderDays(){
+  daysEl.innerHTML = '';
+  const daysInMonth = new Date(selYear, selMonth+1, 0).getDate();
+  if(selDay > daysInMonth) selDay = daysInMonth;
+  for(let di=1; di<=daysInMonth; di++){
+    const d = document.createElement('div');
+    d.className = 'date-item' + (di === selDay ? ' active' : '');
+    d.textContent = di;
+    d.onclick = () => { selDay = di; renderDays(); setSelectedDateFromSel(); renderAll(); };
+    daysEl.appendChild(d);
+  }
+}
+
+/* -------------------------
+   Render times column
+   ------------------------- */
+function initTimes(){
+  timesCol.innerHTML = '';
+  const HEADER_OFFSET = 40;
+  for(let h=8;h<=22;h++){
+    const div=document.createElement('div'); div.style.marginTop = (h === 8 ? HEADER_OFFSET + 'px' : '0'); div.className='slot'; div.style.height='60px'; div.textContent=String(h).padStart(2,'0')+':00'; timesCol.appendChild(div);
+  }
+  // scroll sync
+  let syncing=false;
+  timesCol.addEventListener('scroll', ()=>{ if(syncing) return; syncing=true; board.scrollTop = timesCol.scrollTop; setTimeout(()=>syncing=false,20); });
+  board.addEventListener('scroll', ()=>{ if(syncing) return; syncing=true; timesCol.scrollTop = board.scrollTop; setTimeout(()=>syncing=false,20); });
+}
+
+/* -------------------------
+   render board & appointments
+   ------------------------- */
+function renderBoardColumns(){
+  board.innerHTML = '';
+  cabinets.forEach((cab, idx)=>{
+    const col = document.createElement('div'); col.className='cabinet'; col.dataset.cabId = cab.id;
+    const header = document.createElement('div'); header.className='header';
+    const nameSpan = document.createElement('div'); nameSpan.className='cab-name'; nameSpan.textContent = cab.name;
+    const controls = document.createElement('div'); controls.className='cab-controls';
+    const editBtn = document.createElement('button'); editBtn.className='btn small ghost'; editBtn.textContent='Edit'; editBtn.onclick = (e)=>{ e.stopPropagation(); const newName = prompt('Nume cabinet:', cab.name); if(newName){ cab.name = newName; saveLocal(); renderCabList(); renderBoardColumns(); renderCabSelect(); renderAll(); } 
+  const spacer = document.createElement('div'); spacer.style.height='30px'; timesCol.appendChild(spacer);
+};
+    const delBtn = document.createElement('button'); delBtn.className='btn small'; delBtn.textContent='Șterge'; delBtn.onclick = (e)=>{ e.stopPropagation(); if(confirm('Ștergi cabinetul? (vor fi șterse și programările din el)')){ appts = appts.filter(a=>a.cabId!==cab.id); cabinets = cabinets.filter(c=>c.id!==cab.id); saveLocal(); renderCabList(); renderBoardColumns(); renderCabSelect(); renderAll(); } };
+    controls.appendChild(editBtn); controls.appendChild(delBtn);
+    header.appendChild(nameSpan); header.appendChild(controls);
+    col.appendChild(header);
+
+    const timeline = document.createElement('div'); timeline.className='timeline'; timeline.id = 'tl_'+cab.id;
+    for(let h=0;h<=24;h++){
+      const line=document.createElement('div');
+      line.className='hour-line';
+      line.style.top=(h*60)+'px';
+      line.style.position='absolute';
+      line.style.left=0; line.style.right=0;
+      line.style.borderTop='1px solid rgba(0,0,0,0.03)';
+      timeline.appendChild(line);
+    }
+    timeline.addEventListener('dblclick', (e)=>{
+      const rect = timeline.getBoundingClientRect();
+      const y = e.clientY - rect.top; const startMin = Math.max(0, Math.min(1439, Math.floor(y)));
+      openModalForNew(cab.id, startMin);
+    });
+    timeline.addEventListener('click', (e)=>{
+      if(e.target === timeline || e.target.classList.contains('hour-line')){
+        const rect = timeline.getBoundingClientRect();
+        const y = e.clientY - rect.top; const startMin = Math.max(0, Math.min(1439, Math.floor(y)));
+        openModalForNew(cab.id, startMin);
+      }
+    });
+
+    col.appendChild(timeline);
+    board.appendChild(col);
+  });
+}
+
+function createCurrentTimeLine() {
+  let line = document.getElementById("currentTimeLine");
+  if (!line) {
+    line = document.createElement("div");
+    line.id = "currentTimeLine";
+    line.style.position = "absolute";
+    line.style.left = "0";
+    line.style.right = "0";
+    line.style.height = "2px";
+    line.style.background = "red";
+    line.style.zIndex = "1000";
+    // Append to each cabinet timeline for continuous view
+    document.querySelectorAll('.timeline').forEach(tl => {
+      const clone = line.cloneNode();
+      clone.id = "currentTimeLine";
+      tl.appendChild(clone);
+    });
+  }
+  function updateLinePosition() {
+    const now = new Date();
+    const hour = now.getHours();
+    const min = now.getMinutes();
+    const totalMinutes = (hour - 8) * 60 + min; // offset from 8:00
+    document.querySelectorAll('#currentTimeLine').forEach(lineEl => {
+      if (totalMinutes >= 0 && totalMinutes <= (14*60)) { // between 8:00 and 22:00
+        lineEl.style.top = totalMinutes + "px";
+        lineEl.style.display = "block";
+      } else {
+        lineEl.style.display = "none";
+      }
+    });
+  }
+  updateLinePosition();
+  setInterval(updateLinePosition, 60000);
+}
+
+
+function layoutAppointmentsForCab(list, containerEl){
+  list.sort((a,b)=>a.startMin - b.startMin);
+  const cols = [];
+  const apptMeta = {};
+  for(const a of list){
+    let placedCol = -1;
+    for(let c=0;c<cols.length;c++){
+      const last = cols[c][cols[c].length-1];
+      if(last.startMin + last.dur <= a.startMin){
+        cols[c].push(a); placedCol = c; break;
+      }
+    }
+    if(placedCol === -1){ cols.push([a]); placedCol = cols.length - 1; }
+    apptMeta[a.id] = {col:placedCol};
+  }
+  const totalCols = Math.max(1, cols.length);
+  const widthPct = 100 / totalCols;
+  containerEl.innerHTML = '';
+  for(const a of list){
+    const doc = doctors.find(d=>d.id===a.doctorId) || {nume:'--', culoare:'#ddd'};
+    const tr = treatments.find(t=>t.id===a.treatId) || {nume:'--', culoare:'#fff'};
+    const el = document.createElement('div'); el.className='appt'; el.dataset.id = a.id;
+    const top = a.startMin; const height = Math.max(18,a.dur);
+    const meta = apptMeta[a.id];
+    const leftPct = meta.col * widthPct;
+    el.style.top = top+'px';
+    el.style.height = height+'px';
+    el.style.width = `calc(${widthPct}% - 10px)`;
+    el.style.left = `calc(${leftPct}% + 8px)`;
+    const leftCol = hexToRgba(doc.culoare, 0.92);
+    const rightCol = hexToRgba(tr.culoare, 0.95);
+    el.style.background = `linear-gradient(90deg, ${leftCol} 0%, ${leftCol} 48%, ${rightCol} 52%, ${rightCol} 100%)`;
+
+    const leftZone = document.createElement('div'); leftZone.style.width='60%'; leftZone.style.overflow='hidden';
+    leftZone.innerHTML = `<div class="label">${a.name} ${a.age?('('+a.age+')'):''}</div><div class="meta">${doc.nume} • ${minToHhmm(a.startMin)}</div>`;
+    const rightZone = document.createElement('div'); rightZone.style.width='40%'; rightZone.innerHTML = `<div class="meta">${tr.nume}</div>`;
+    const resize = document.createElement('div'); resize.className='resize';
+    el.appendChild(leftZone); el.appendChild(rightZone); el.appendChild(resize);
+
+    el.addEventListener('mouseenter', (ev)=>{ el.classList.add('expanded'); showTooltip(a, ev.pageX, ev.pageY); });
+    el.addEventListener('mousemove', (ev)=> moveTooltip(ev.pageX, ev.pageY));
+    el.addEventListener('mouseleave', ()=>{ el.classList.remove('expanded'); hideTooltip(); });
+    el.addEventListener('dblclick', (ev)=>{ ev.stopPropagation(); openModalForEdit(a); });
+    el.addEventListener('dblclick', (ev)=>{ ev.stopPropagation(); openModalForEdit(a); });
+    el.addEventListener('contextmenu', (ev)=>{ ev.preventDefault(); if(confirm('Ștergi programarea?')){ appts = appts.filter(x=>x.id!==a.id); saveLocal(); renderAll(); } });
+
+    attachInteractions(el, a, containerEl);
+
+    // Add edit button
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '✏️';
+    editBtn.style.position = 'absolute';
+    editBtn.style.top = '2px';
+    editBtn.style.right = '2px';
+    editBtn.style.background = 'transparent';
+    editBtn.style.border = 'none';
+    editBtn.style.cursor = 'pointer';
+    editBtn.onclick = (ev)=>{ ev.stopPropagation(); openModalForEdit(a); };
+    el.appendChild(editBtn);
+    containerEl.appendChild(el);
+  }
+}
+
+function renderAll(){
+  cabinets.forEach(cab=>{
+    const container = document.getElementById('tl_'+cab.id);
+    if(!container) return;
+    const list = appts.filter(a=>a.cabId===cab.id && a.date===selectedDate);
+    layoutAppointmentsForCab(list, container);
+  });
+}
+
+/* -------------------------
+   Tooltip helpers & modal
+   ------------------------- */
+function showTooltip(a,x,y){ const doc = doctors.find(d=>d.id===a.doctorId); const tr=treatments.find(t=>t.id===a.treatId); tooltip.innerHTML = `<strong>${a.name}</strong><br>` + (a.age ? `Vârstă: ${a.age}<br>` : '') + (a.phone ? `Telefon: ${a.phone}<br>` : '') + (doc ? `Medic: ${doc.nume}<br>` : '') + (tr ? `Tratament: ${tr.nume}<br>` : '') + (a.notes ? `Mentiuni: ${a.notes}` : ''); tooltip.style.display='block'; moveTooltip(x,y); }
+function moveTooltip(x,y){ tooltip.style.left = (x+12) + 'px'; tooltip.style.top = (y+12) + 'px'; }
+function hideTooltip(){ tooltip.style.display='none'; }
+
+let editingId = null;
+function openModalForNew(cabId, startMin){
+  editingId = null; modal.style.display='block'; document.getElementById('modalTitle').textContent='Adaugă programare';
+  inpName.value=''; inpAge.value=''; inpPhone.value=''; renderDoctorSelects(); renderTreatSelects(); renderCabSelect();
+  inpCab.value = cabId || (cabinets[0] && cabinets[0].id) || '';
+  inpStart.value = minToHhmm(startMin||9*60); inpDur.value=30; inpNotes.value=''; btnDelete.style.display='none';
+}
+function openModalForEdit(ap){
+  editingId = ap.id; 
+    // Show delete button
+    let delBtn = document.getElementById('btnDeleteAppt');
+    if(!delBtn){
+        delBtn = document.createElement('button');
+        delBtn.id = 'btnDeleteAppt';
+        delBtn.textContent = 'Șterge';
+        delBtn.onclick = function(){
+            appts = appts.filter(x => x.id !== ap.id);
+            saveLocal();
+            modal.style.display = 'none';
+            renderAllViews();
+        };
+        modal.querySelector('.modal-footer')?.appendChild(delBtn);
+    }
+    modal.style.display='block'; document.getElementById('modalTitle').textContent='Editează programare';
+  inpName.value=ap.name; inpAge.value=ap.age||''; inpPhone.value=ap.phone||''; renderDoctorSelects(); renderTreatSelects(); renderCabSelect();
+  inpDoctor.value=ap.doctorId; inpTreat.value=ap.treatId; inpCab.value=ap.cabId; inpStart.value=minToHhmm(ap.startMin); inpDur.value=ap.dur; inpNotes.value=ap.notes||''; btnDelete.style.display='inline-block';
+}
+btnCancel.onclick = ()=>{ modal.style.display='none'; }
+btnSave.onclick = ()=>{
+  const name = inpName.value || 'Anonim'; const age = inpAge.value || ''; const phone = inpPhone.value || '';
+  const doctorId = inpDoctor.value; const treatId = inpTreat.value; const cabsel = inpCab.value;
+  const startMinVal = hhmmToMin(inpStart.value); const dur = Math.max(5, parseInt(inpDur.value)||30); const notes = inpNotes.value||'';
+  if(editingId){
+    const ap = appts.find(a=>a.id===editingId);
+    if(ap){ ap.startMin = hhmmToMin(inpStart.value); ap.name=name; ap.age=age; ap.phone=phone; ap.doctorId=doctorId; ap.treatId=treatId; ap.cabId=cabsel; ap.startMin = hhmmToMin(inpStart.value); ap.startMin=startMinVal; ap.dur=dur; ap.notes=notes; ap.date = selectedDate; }
+  } else {
+    appts.push({id:uid('a'), cabId:cabsel, startMin: hhmmToMin(inpStart.value), startMin:startMinVal, dur:dur, name, age, phone, doctorId, treatId, notes, date:selectedDate});
+  }
+  saveLocal(); modal.style.display='none'; renderAll();
+};
+btnDelete.onclick = ()=>{
+  if(editingId && confirm('Ștergi această programare?')){
+    appts = appts.filter(a=>a.id !== editingId);
+    saveLocal(); modal.style.display='none'; renderAll();
+  }
+};
+
+/* -------------------------
+   Drag & resize interactions (pointer events)
+   ------------------------- */
+let dragState = null;
+function attachInteractions(el, a, containerEl){
+  el.addEventListener('pointerdown', (ev)=>{
+    ev.preventDefault(); el.setPointerCapture(ev.pointerId);
+    const rect = el.getBoundingClientRect();
+    const parentRect = containerEl.getBoundingClientRect();
+    const isResizing = ev.target.classList.contains('resize');
+    dragState = { id:a.id, startY:ev.clientY, startTop:rect.top - parentRect.top, startH:rect.height, isResizing, fromCabId:a.cabId };
+  });
+  document.addEventListener('pointermove', onPointerMove);
+  document.addEventListener('pointerup', onPointerUp);
+}
+function onPointerMove(ev){
+  if(!dragState) return;
+  const el = document.querySelector(`[data-id="${dragState.id}"]`);
+  if(!el) return;
+  const container = document.getElementById('tl_'+dragState.fromCabId);
+  if(dragState.isResizing){
+    const dy = ev.clientY - dragState.startY;
+    const newH = Math.max(10, dragState.startH + dy);
+    el.style.height = newH + 'px';
+  } else {
+    const dy = ev.clientY - dragState.startY;
+    const newTop = Math.max(0, dragState.startTop + dy);
+    el.style.top = newTop + 'px';
+    const boardRect = board.getBoundingClientRect(); const relX = ev.clientX - boardRect.left;
+    const cabWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cab-width')) || 300;
+    const cabIdx = Math.floor(relX / cabWidth);
+    document.querySelectorAll('.cabinet').forEach((c,i)=> c.style.outline = (i===cabIdx? '2px dashed rgba(37,99,235,0.35)':'none') );
+  }
+}
+function onPointerUp(ev){
+  if(!dragState) return;
+  const el = document.querySelector(`[data-id="${dragState.id}"]`);
+  if(!el){ dragState=null; return; }
+  try{ el.releasePointerCapture(ev.pointerId); }catch(e){}
+  document.querySelectorAll('.cabinet').forEach(c=> c.style.outline='none');
+  const ap = appts.find(a=>a.id===dragState.id);
+  if(!ap){ dragState=null; return; }
+  if(dragState.isResizing){
+    const h = parseFloat(el.style.height);
+    ap.dur = Math.max(5, Math.round(h));
+  } else {
+    const top = parseFloat(el.style.top);
+    ap.startMin = pxToMin(top);
+    const boardRect = board.getBoundingClientRect(); const relX = ev.clientX - boardRect.left;
+    const cabWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cab-width')) || 300;
+    const cabIdx = Math.floor(relX / cabWidth);
+    const newCab = cabinets[cabIdx] && cabinets[cabIdx].id;
+    if(newCab) ap.cabId = newCab;
+  }
+  dragState=null; saveLocal(); renderAll();
+}
+
+/* -------------------------
+   UI actions: add cabinet / add doctor / add treat
+   ------------------------- */
+document.getElementById('btnAddCab').onclick = ()=>{
+  const name = prompt('Nume cabinet nou:','Cabinet ' + (cabinets.length + 1));
+  if(name){ cabinets.push({id:uid('cab'), name}); saveLocal(); renderCabList(); renderBoardColumns(); renderCabSelect(); renderAll(); }
+};
+document.getElementById('btnAddDoctor').onclick = ()=>{
+  const name = prompt('Nume medic nou:');
+  if(name){ doctors.push({id:uid('d'), nume:name, culoare:'#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}); saveLocal(); renderSidebarLists(); renderDoctorSelects(); renderAll(); }
+};
+document.getElementById('btnAddTreat').onclick = ()=>{
+  const name = prompt('Nume tratament nou:');
+  if(name){ treatments.push({id:uid('t'), nume:name, culoare:'#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}); saveLocal(); renderSidebarLists(); renderTreatSelects(); renderAll(); }
+};
+
+/* export / import */
+document.getElementById('btnExport').onclick = ()=>{
+  const payload = {cabinets, doctors, treatments, appts};
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'programari-backup.json'; a.click(); URL.revokeObjectURL(url);
+};
+document.getElementById('btnImport').onclick = ()=>{
+  const input = document.createElement('input'); input.type='file'; input.accept='application/json';
+  input.onchange = (e)=>{
+    const f = e.target.files[0]; if(!f) return;
+    const reader = new FileReader(); reader.onload = ()=>{
+      try{
+        const p = JSON.parse(reader.result);
+        if(p.cabinets && p.doctors && p.treatments && p.appts){
+          cabinets = p.cabinets; doctors = p.doctors; treatments = p.treatments; appts = p.appts; saveLocal(); renderAllViews(); alert('Import reușit');
+        } else alert('Format JSON invalid');
+      }catch(err){ alert('Eroare la parsare JSON'); }
+    }; reader.readAsText(f);
+  };
+  input.click();
+};
+
+/* -------------------------
+   Firebase Firestore cloud save/load
+   ------------------------- */
+</script>
+<!-- Firebase Firestore Integration -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAhP6GNu1n6tJpUSFszqlPnlcbGIjrujuI",
+    authDomain: "programari-ce6b1.firebaseapp.com",
+    projectId: "programari-ce6b1",
+    storageBucket: "programari-ce6b1.firebasestorage.app",
+    messagingSenderId: "3858865235",
+    appId: "1:3858865235:web:d9a9ee00ca0b27549cfaa6",
+    measurementId: "G-4GMXTD3W93"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  async function saveToCloud() {
+    const payload = { cabinets, doctors, treatments, appts };
+    await setDoc(doc(db, "scheduler", "data"), payload);
+    alert("Date salvate în Firebase!");
+  }
+
+  async function loadFromCloud() {
+    const snap = await getDoc(doc(db, "scheduler", "data"));
+    if (snap.exists()) {
+      const data = snap.data();
+      cabinets = data.cabinets || [];
+      doctors = data.doctors || [];
+      treatments = data.treatments || [];
+      appts = data.appts || [];
+      saveLocal();
+      renderAllViews();
+      alert("Date încărcate din Firebase!");
+    } else {
+      alert("Nu există date în cloud.");
+    }
+  }
+
+  document.getElementById("btnSaveCloud").onclick = saveToCloud;
+  document.getElementById("btnLoadCloud").onclick = loadFromCloud;
+
+// Auto-load from Firebase on startup
+(async () => {
+  try {
+    const snap = await getDoc(doc(db, "scheduler", "data"));
+    if (snap.exists()) {
+      const data = snap.data();
+      cabinets = data.cabinets || [];
+      doctors = data.doctors || [];
+      treatments = data.treatments || [];
+      appts = data.appts || [];
+      saveLocal();
+      renderAllViews();
+      console.log("Date încărcate automat din Firebase la pornire.");
+    } else {
+      console.log("Nu există date în Firebase, se folosesc cele locale.");
+    }
+  } catch (err) {
+    console.error("Eroare la încărcarea automată din Firebase:", err);
+  }
+})();
+
+</script>
+<script>
+
+/* -------------------------
+   render helpers & init
+   ------------------------- */
+function renderCabList(){ cabListEl.innerHTML=''; cabinets.forEach(c=>{ const div=document.createElement('div'); div.className='list-item'; const name=document.createElement('div'); name.textContent=c.name; name.style.flex='1'; const editBtn=document.createElement('button'); editBtn.className='btn small ghost'; editBtn.textContent='Edit'; editBtn.onclick=()=>{ const nn=prompt('Nume cabinet:',c.name); if(nn){ c.name=nn; saveLocal(); renderCabList(); renderBoardColumns(); renderCabSelect(); renderAll(); } }; const delBtn=document.createElement('button'); delBtn.className='btn small'; delBtn.textContent='Șterge'; delBtn.onclick=()=>{ if(confirm('Ștergi cabinetul?')){ appts=appts.filter(a=>a.cabId!==c.id); cabinets=cabinets.filter(x=>x.id!==c.id); saveLocal(); renderCabList(); renderBoardColumns(); renderCabSelect(); renderAll(); } }; div.appendChild(name); div.appendChild(editBtn); div.appendChild(delBtn); cabListEl.appendChild(div); }); }
+function renderSidebarLists(){ doctorsList.innerHTML=''; doctors.forEach(d=>{ const div=document.createElement('div'); div.className='list-item'; const dot=document.createElement('div'); dot.className='color-dot'; dot.style.background=d.culoare; const name=document.createElement('div'); name.textContent=d.nume; name.style.flex='1'; const colorInput=document.createElement('input'); colorInput.type='color'; colorInput.value=d.culoare; colorInput.oninput=(ev)=>{ d.culoare=ev.target.value; dot.style.background=d.culoare; saveLocal(); renderAll(); renderDoctorSelects(); }; const editBtn=document.createElement('button'); editBtn.className='btn small ghost'; editBtn.textContent='Edit'; editBtn.onclick=()=>{ const newName=prompt('Nume medic:',d.nume); if(newName){ d.nume=newName; saveLocal(); renderSidebarLists(); renderDoctorSelects(); renderAll(); } }; const delBtn=document.createElement('button'); delBtn.className='btn small'; delBtn.textContent='Șterge'; delBtn.onclick=()=>{ if(confirm('Ștergi medicul?')){ doctors=doctors.filter(x=>x.id!==d.id); saveLocal(); renderSidebarLists(); renderDoctorSelects(); renderAll(); } }; div.appendChild(dot); div.appendChild(name); div.appendChild(colorInput); div.appendChild(editBtn); div.appendChild(delBtn); doctorsList.appendChild(div); }); treatList.innerHTML=''; treatments.forEach(t=>{ const div=document.createElement('div'); div.className='list-item'; const dot=document.createElement('div'); dot.className='color-dot'; dot.style.background=t.culoare; const name=document.createElement('div'); name.textContent=t.nume; name.style.flex='1'; const colorInput=document.createElement('input'); colorInput.type='color'; colorInput.value=t.culoare; colorInput.oninput=(ev)=>{ t.culoare=ev.target.value; dot.style.background=t.culoare; saveLocal(); renderAll(); renderTreatSelects(); }; const editBtn=document.createElement('button'); editBtn.className='btn small ghost'; editBtn.textContent='Edit'; editBtn.onclick=()=>{ const newName=prompt('Nume tratament:',t.nume); if(newName){ t.nume=newName; saveLocal(); renderSidebarLists(); renderTreatSelects(); renderAll(); } }; const delBtn=document.createElement('button'); delBtn.className='btn small'; delBtn.textContent='Șterge'; delBtn.onclick=()=>{ if(confirm('Ștergi tratamentul?')){ treatments=treatments.filter(x=>x.id!==t.id); saveLocal(); renderSidebarLists(); renderTreatSelects(); renderAll(); } }; div.appendChild(dot); div.appendChild(name); div.appendChild(colorInput); div.appendChild(editBtn); div.appendChild(delBtn); treatList.appendChild(div); }); }
+function renderDoctorSelects(){ inpDoctor.innerHTML=''; doctors.forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=d.nume; inpDoctor.appendChild(o); }); }
+function renderTreatSelects(){ inpTreat.innerHTML=''; treatments.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.nume; inpTreat.appendChild(o); }); }
+function renderCabSelect(){ inpCab.innerHTML=''; cabinets.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; inpCab.appendChild(o); }); }
+
+function renderAllViews(){ initTimes(); renderBoardColumns();
+  createCurrentTimeLine(); renderCabList(); renderSidebarLists(); renderDoctorSelects(); renderTreatSelects(); renderCabSelect(); renderAll(); }
+
+/* -------------------------
+   initializare
+   ------------------------- */
+(function init(){
+  const ok = loadLocal();
+  if(!ok){ bootstrapDefaults(); }
+  initDateStateFromSelected();
+  renderYears(); renderMonths(); renderDays();
+  renderAllViews();
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') modal.style.display='none'; });
+  window._app = {cabinets,doctors,treatments,appts,saveLocal,renderAll};
+})();
+
+</script>
+
+<!-- Script pentru auto-rezizare iframe cu observer -->
+<script>
+function sendHeight() {
+  window.parent.postMessage(
+    { type: "resize-iframe", height: document.body.scrollHeight },
+    "*"
+  );
+}
+setInterval(sendHeight, 1000); // fallback periodic
+const resizeObserver = new ResizeObserver(sendHeight);
+resizeObserver.observe(document.body);
+window.addEventListener("load", sendHeight);
+window.addEventListener("resize", sendHeight);
+</script>
+
+</body>
+</html>
